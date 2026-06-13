@@ -1,0 +1,102 @@
+## Baby Health Monitoring Module (ESP32)
+
+| Component    | ESP32 Pin |
+| ------------ | --------- |
+| MAX30102 SDA | GPIO 21   |
+| MAX30102 SCL | GPIO 22   |
+| MPU6050 SDA  | GPIO 21   |
+| MPU6050 SCL  | GPIO 22   |
+| OLED SDA     | GPIO 21   |
+| OLED SCL     | GPIO 22   |
+| DS18B20 Data | GPIO 4    |
+| GSR Sensor   | GPIO 34   |
+| Red LED      | GPIO 25   |
+| Green LED    | GPIO 26   |
+| Blue LED     | GPIO 27   |
+
+---
+
+## Environmental Monitoring Module (ESP32)
+
+| Component                | ESP32 Pin |
+| ------------------------ | --------- |
+| BME280 SDA               | GPIO 21   |
+| BME280 SCL               | GPIO 22   |
+| OLED SDA                 | GPIO 21   |
+| OLED SCL                 | GPIO 22   |
+| Soil Moisture Sensor     | GPIO 34   |
+| MQ135 Air Quality Sensor | GPIO 35   |
+| Buzzer                   | GPIO 25   |
+| Exhaust Fan Relay        | GPIO 26   |
+| Cooling Fan Relay        | GPIO 27   |
+
+---
+
+## Cry Detection & Mother Voice Response Module
+
+| Component          | Connection                    |
+| ------------------ | ----------------------------- |
+| LM393 Sound Sensor | Sound Detection Input         |
+| DFPlayer Mini      | Audio Playback                |
+| MicroSD Card       | Stores Mother Voice Recording |
+| Speaker            | Audio Output                  |
+| TP4056 Module      | Battery Charging              |
+| Lithium Battery    | Power Supply                  |
+
+### Working
+
+* LM393 continuously monitors sound.
+* When baby crying is detected, DFPlayer Mini is activated.
+* DFPlayer Mini plays pre-recorded mother's voice through the speaker.
+* Helps calm the infant until caregivers respond.
+
+---
+
+## ESP32-CAM Live Monitoring Module
+
+| Camera Signal | ESP32-CAM Pin |
+| ------------- | ------------- |
+| PWDN          | GPIO 32       |
+| XCLK          | GPIO 0        |
+| SIOD          | GPIO 26       |
+| SIOC          | GPIO 27       |
+| Y2            | GPIO 5        |
+| Y3            | GPIO 18       |
+| Y4            | GPIO 19       |
+| Y5            | GPIO 21       |
+| Y6            | GPIO 36       |
+| Y7            | GPIO 39       |
+| Y8            | GPIO 34       |
+| Y9            | GPIO 35       |
+| VSYNC         | GPIO 25       |
+| HREF          | GPIO 23       |
+| PCLK          | GPIO 22       |
+
+### Working
+
+* ESP32-CAM connects to Wi-Fi.
+* Creates a live video stream.
+* Caregivers can access the stream using the device IP address.
+* Enables remote visual monitoring of the infant.
+
+---
+
+## Emergency Safety System
+
+| Component               | Purpose                     |
+| ----------------------- | --------------------------- |
+| Oxygen Cylinder         | Emergency Oxygen Support    |
+| Relay Module            | Fan Control                 |
+| Exhaust Fan             | Air Circulation             |
+| Cooling Fan             | Temperature Regulation      |
+| Traffic Light Indicator | Health Status Visualization |
+| Buzzer                  | Emergency Alerts            |
+
+### Status Indicators
+
+🟢 Green → Normal Condition
+
+🟡 Yellow/Blue → Warning Condition
+
+🔴 Red → Critical Condition
+
