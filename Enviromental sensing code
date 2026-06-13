@@ -1,0 +1,134 @@
+#include <Wire.h>
+#include <Adafruit_BME280.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h>
+
+#define SOIL_PIN   34
+#define AIR_PIN    35
+#define BUZZER_PIN 25
+
+#define RELAY_EXHAUST 26
+#define RELAY_COOLER  27
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+Adafruit_BME280 bme;
+Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// Convert Air Quality
+int getAirQualityPercent(int raw) {
+  int percent = map(raw, 0, 4095, 100, 1);
+  return constrain(percent, 1, 100);
+}
+
+void setup() {
+
+  Serial.begin(9600);
+
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(RELAY_EXHAUST, OUTPUT);
+  pinMode(RELAY_COOLER, OUTPUT);
+
+  // Active LOW relay OFF state
+  digitalWrite(BUZZER_PIN, LOW);
+  digitalWrite(RELAY_EXHAUST, HIGH);
+  digitalWrite(RELAY_COOLER, HIGH);
+
+  Wire.begin(21,22);
+
+  // OLED Start
+  if(!display.begin(0x3C, true)){
+    Serial.println("OLED not found");
+    while(1);
+  }
+
+  // BME280 Start
+  if(!bme.begin(0x76)){
+    Serial.println("BME280 not found");
+    while(1);
+  }
+
+  display.clearDisplay();
+  display.setTextColor(SH110X_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0,0);
+  display.print("Vital Nova Pod");
+  display.display();
+
+  delay(1500);
+}
+
+void loop() {
+
+  int soilValue = analogRead(SOIL_PIN);
+  int airRaw = analogRead(AIR_PIN);
+  int airPercent = getAirQualityPercent(airRaw);
+
+  float temperature = bme.readTemperature();
+  float humidity = bme.readHumidity();
+
+  bool diaperWet = soilValue < 2000;
+
+  // BUZZER
+  digitalWrite(BUZZER_PIN, diaperWet ? HIGH : LOW);
+
+  // Exhaust + Cooler Logic
+  bool exhaustState = false;
+  bool coolerState = false;
+
+  if (temperature >= 29 && humidity < 70) {
+    exhaustState = true;
+    coolerState = true;
+  }
+  else if (temperature >= 27) {
+    exhaustState = true;
+  }
+
+  // Active LOW relay control
+  digitalWrite(RELAY_EXHAUST, exhaustState ? LOW : HIGH);
+  digitalWrite(RELAY_COOLER, coolerState ? LOW : HIGH);
+
+  // -------- DISPLAY --------
+  display.clearDisplay();
+
+  display.setTextSize(1);
+
+  // Title
+  display.setCursor(0,0);
+  display.print("Vital Nova Pod");
+
+  // Temp + Hum
+  display.setCursor(0,14);
+  display.print("Temp:");
+  display.print(temperature,1);
+  display.print("C");
+
+  display.setCursor(70,14);
+  display.print("Hum:");
+  display.print(humidity,0);
+  display.print("%");
+
+  // Air Quality
+  display.setCursor(0,28);
+  display.print("Air:");
+  display.print(airPercent);
+  display.print("%");
+
+  // Diaper Status
+  display.setCursor(0,42);
+  display.print("Diaper:");
+  display.print(diaperWet ? "WET" : "DRY");
+
+  // Exhaust + Cool
+  display.setCursor(0,56);
+  display.print("Exh:");
+  display.print(exhaustState ? "ON " : "OFF");
+
+  display.print(" Cool:");
+  display.print(coolerState ? "ON" : "OFF");
+
+  display.display();
+
+  delay(2000);
+}
