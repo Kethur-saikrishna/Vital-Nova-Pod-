@@ -1,0 +1,298 @@
+#include <Wire.h>
+#include "MAX30105.h"
+#include "spo2_algorithm.h"
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h>
+#include <MPU6050.h>
+#include <math.h>
+
+// ---------- OLED ----------
+#define OLED_ADDR 0x3C
+Adafruit_SH1106G display(128, 64, &Wire, -1);
+
+// ---------- ESP32 PINS ----------
+#define SDA_PIN 21
+#define SCL_PIN 22
+
+#define ONE_WIRE_BUS 4
+#define GSR_PIN 34
+
+#define RED_LED   25
+#define GREEN_LED 26
+#define BLUE_LED  27
+
+// ---------- OBJECTS ----------
+MAX30105 max30102;
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature ds18b20(&oneWire);
+MPU6050 mpu;
+
+
+// ---------- SPO2 ----------
+uint32_t irBuffer[100];
+uint32_t redBuffer[100];
+
+int32_t spo2;
+int8_t validSPO2;
+
+int32_t heartRate;
+int8_t validHeartRate;
+
+
+// ---------- STATUS ----------
+String healthStatus="----";
+String gsrStatus="----";
+String motionStatus="SAFE";
+
+
+// ---------- MPU ----------
+int16_t ax,ay,az,gx,gy,gz;
+float axg,ayg,azg;
+float angleX,angleY;
+bool fallDetected=false;
+
+
+
+// ---------- SETUP ----------
+void setup()
+{
+
+Serial.begin(115200);
+
+pinMode(RED_LED,OUTPUT);
+pinMode(GREEN_LED,OUTPUT);
+pinMode(BLUE_LED,OUTPUT);
+
+pinMode(GSR_PIN,INPUT);
+
+Wire.begin(SDA_PIN,SCL_PIN);
+
+
+// ---------- OLED ----------
+display.begin(OLED_ADDR,true);
+display.clearDisplay();
+
+display.setTextSize(1);
+display.setTextColor(SH110X_WHITE);
+
+display.setCursor(10,10);
+display.println("VITAL NOVA POD");
+
+display.setCursor(20,30);
+display.println("Starting...");
+
+display.display();
+
+delay(2000);
+
+
+// ---------- DS18B20 ----------
+ds18b20.begin();
+
+
+// ---------- MAX30102 ----------
+if(!max30102.begin(Wire,I2C_SPEED_FAST))
+{
+display.clearDisplay();
+display.setCursor(0,20);
+display.println("MAX30102 ERROR");
+display.display();
+while(1);
+}
+
+max30102.setup();
+max30102.setPulseAmplitudeRed(0x2F);
+max30102.setPulseAmplitudeIR(0x2F);
+
+
+// ---------- MPU6050 ----------
+mpu.initialize();
+
+if(!mpu.testConnection())
+{
+display.clearDisplay();
+display.setCursor(0,20);
+display.println("MPU6050 ERROR");
+display.display();
+while(1);
+}
+
+
+// Stability settings
+mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
+mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_250);
+
+}
+
+
+
+// ---------- LOOP ----------
+void loop()
+{
+
+// ---------- MAX30102 ----------
+
+for(byte i=0;i<100;i++)
+{
+while(max30102.available()==false)
+max30102.check();
+
+redBuffer[i]=max30102.getRed();
+irBuffer[i]=max30102.getIR();
+max30102.nextSample();
+}
+
+maxim_heart_rate_and_oxygen_saturation(
+irBuffer,
+100,
+redBuffer,
+&spo2,
+&validSPO2,
+&heartRate,
+&validHeartRate
+);
+
+
+// ---------- TEMPERATURE ----------
+
+ds18b20.requestTemperatures();
+float bodyTemp=ds18b20.getTempCByIndex(0);
+
+
+// ---------- GSR ----------
+
+int gsrValue=analogRead(GSR_PIN);
+
+if(gsrValue<1200)
+gsrStatus="LOW";
+
+else if(gsrValue<2500)
+gsrStatus="NORMAL";
+
+else
+gsrStatus="HIGH";
+
+
+
+// ---------- MPU6050 ----------
+
+mpu.getMotion6(&ax,&ay,&az,&gx,&gy,&gz);
+
+axg=ax/16384.0;
+ayg=ay/16384.0;
+azg=az/16384.0;
+
+angleX=atan(axg/sqrt(ayg*ayg+azg*azg))*57.3;
+angleY=atan(ayg/sqrt(axg*axg+azg*azg))*57.3;
+
+float totalAccel=sqrt(axg*axg+ayg*ayg+azg*azg);
+
+
+// SAFE / NOT SAFE detection
+
+if(totalAccel>2.2 || abs(angleX)>60 || abs(angleY)>60)
+{
+fallDetected=true;
+motionStatus="NOT SAFE";
+}
+else
+{
+fallDetected=false;
+motionStatus="SAFE";
+}
+
+
+
+// ---------- HEALTH STATUS ----------
+
+setHealthCondition(bodyTemp,heartRate,fallDetected);
+
+
+
+// ---------- OLED DISPLAY ----------
+
+display.clearDisplay();
+
+display.setCursor(0,0);
+display.println("VITAL NOVA POD");
+display.println("----------------");
+
+display.print("Temp : ");
+display.print(bodyTemp,1);
+display.println("C");
+
+display.print("HR   : ");
+if(validHeartRate)
+display.println(heartRate);
+else
+display.println("--");
+
+
+display.print("SpO2 : ");
+if(validSPO2)
+{
+display.print(spo2);
+display.println("%");
+}
+else
+display.println("--");
+
+
+display.print("Stress: ");
+display.println(gsrStatus);
+
+display.print("Motion: ");
+display.println(motionStatus);
+
+display.println("----------------");
+
+display.print("STATE: ");
+display.println(healthStatus);
+
+display.display();
+
+delay(1000);
+
+}
+
+
+
+// ---------- HEALTH STATUS ----------
+
+void setHealthCondition(float temp,int hr,bool fall)
+{
+
+digitalWrite(RED_LED,LOW);
+digitalWrite(GREEN_LED,LOW);
+digitalWrite(BLUE_LED,LOW);
+
+
+if(fall)
+{
+digitalWrite(RED_LED,HIGH);
+healthStatus="DANGER";
+return;
+}
+
+
+if(temp<37.5 && hr>=60 && hr<=100)
+{
+digitalWrite(GREEN_LED,HIGH);
+healthStatus="NORMAL";
+}
+
+else if(temp>=37.5 || hr>100)
+{
+digitalWrite(BLUE_LED,HIGH);
+healthStatus="WARNING";
+}
+
+else
+{
+digitalWrite(RED_LED,HIGH);
+healthStatus="DANGER";
+}
+
+}
